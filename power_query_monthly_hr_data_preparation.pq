@@ -1,0 +1,27 @@
+let
+    Source = Csv.Document(File.Contents("C:\Users\Lailai\Documents\JonathanJr Temp Files\Excel Coursera\monthly_hr_data_preparation\Monthly_Workforce_Extract.csv"),[Delimiter=",", Columns=9, Encoding=1252, QuoteStyle=QuoteStyle.None]),
+    #"Promoted Headers" = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
+    #"Changed Type" = Table.TransformColumnTypes(#"Promoted Headers",{{"EmployeeID", type text}, {"EmployeeName", type text}, {"Department", type text}, {"Location", type text}, {"EmploymentStatus", type text}, {"EmploymentType", type text}, {"HireDate", type date}, {"TerminationDate", type date}, {"FTE", type number}}),
+    #"Trimmed Text" = Table.TransformColumns(#"Changed Type",{{"EmployeeID", Text.Trim, type text}, {"EmployeeName", Text.Trim, type text}, {"Department", Text.Trim, type text}, {"Location", Text.Trim, type text}, {"EmploymentStatus", Text.Trim, type text}, {"EmploymentType", Text.Trim, type text}}),
+    #"Capitalized Each Word" = Table.TransformColumns(#"Trimmed Text",{{"EmployeeID", Text.Proper, type text}, {"EmployeeName", Text.Proper, type text}, {"Department", Text.Proper, type text}, {"Location", Text.Proper, type text}, {"EmploymentStatus", Text.Proper, type text}, {"EmploymentType", Text.Proper, type text}}),
+    #"Added Conditional Column" = Table.AddColumn(#"Capitalized Each Word", "DepartmentClean", each if [Department] = "Ops" then "Operations" else if [Department] = "It" then "Information Technology" else if [Department] = "HR" then "Human Resources" else [Department]),
+    #"Reordered Columns" = Table.ReorderColumns(#"Added Conditional Column",{"EmployeeID", "EmployeeName", "DepartmentClean", "Department", "Location", "EmploymentStatus", "EmploymentType", "HireDate", "TerminationDate", "FTE"}),
+    #"Removed Columns" = Table.RemoveColumns(#"Reordered Columns",{"Department"}),
+    #"Renamed Columns" = Table.RenameColumns(#"Removed Columns",{{"DepartmentClean", "Department"}}),
+    #"Removed Duplicates" = Table.Distinct(#"Renamed Columns"),
+    #"Added Conditional Column1" = Table.AddColumn(#"Removed Duplicates", "FTE_Status", each if [FTE] > 1 then "OUT_OF_RANGE" else if [FTE] < 0 then "OUT_OF_RANGE" else "Valid"),
+    #"Added Conditional Column2" = Table.AddColumn(#"Added Conditional Column1", "TerminationDate_Status", each if [TerminationDate] < [HireDate] then "Invalid_Date" else "Valid"),
+    #"Replaced Errors" = Table.ReplaceErrorValues(#"Added Conditional Column2", {{"TerminationDate_Status", "Active"}}),
+    #"Filtered Rows" = Table.SelectRows(#"Replaced Errors", each [TerminationDate_Status] <> "Invalid_Date"),
+    #"Removed Columns1" = Table.RemoveColumns(#"Filtered Rows",{"TerminationDate_Status"}),
+    #"Replaced Value" = Table.ReplaceValue(#"Removed Columns1","Full Time","Full-Time",Replacer.ReplaceText,{"EmploymentType"}),
+    #"Added Custom" = Table.AddColumn(#"Replaced Value", "Custom", each Date.ToText([HireDate], "yyyy-MM-dd")),
+    #"Reordered Columns1" = Table.ReorderColumns(#"Added Custom",{"EmployeeID", "EmployeeName", "Department", "Location", "EmploymentStatus", "EmploymentType", "HireDate", "Custom", "TerminationDate", "FTE", "FTE_Status"}),
+    #"Removed Columns2" = Table.RemoveColumns(#"Reordered Columns1",{"HireDate"}),
+    #"Renamed Columns1" = Table.RenameColumns(#"Removed Columns2",{{"Custom", "HireDate"}}),
+    #"Added Custom1" = Table.AddColumn(#"Renamed Columns1", "Termination", each Date.ToText([TerminationDate],"yyyy-MM-dd")),
+    #"Reordered Columns2" = Table.ReorderColumns(#"Added Custom1",{"EmployeeID", "EmployeeName", "Department", "Location", "EmploymentStatus", "EmploymentType", "HireDate", "Termination", "TerminationDate", "FTE", "FTE_Status"}),
+    #"Removed Columns3" = Table.RemoveColumns(#"Reordered Columns2",{"TerminationDate"}),
+    #"Renamed Columns2" = Table.RenameColumns(#"Removed Columns3",{{"Termination", "TerminationDate"}})
+in
+    #"Renamed Columns2"
